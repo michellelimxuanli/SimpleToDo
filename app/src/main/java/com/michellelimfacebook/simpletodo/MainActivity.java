@@ -1,5 +1,6 @@
 package com.michellelimfacebook.simpletodo;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -18,7 +19,13 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
-    //only declared, but not initialized
+
+    //numeric code to identify edit activity
+    public final static int EDIT_REQUEST_CODE = 20;
+    //keys used for passing data between activities
+    public final static String ITEM_TEXT = "itemText";
+    public final static String ITEM_POSITION = "itemPosition";
+
     ArrayList<String> items;
     ArrayAdapter<String> itemsAdapter;
     ListView lvItems;
@@ -30,7 +37,6 @@ public class MainActivity extends AppCompatActivity {
 
         readItems();
         itemsAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, items);
-        //This R changes every time at run time
         lvItems = (ListView) findViewById(R.id.lvItems);
         lvItems.setAdapter(itemsAdapter);
 
@@ -42,29 +48,51 @@ public class MainActivity extends AppCompatActivity {
         EditText etNewItem=  (EditText) findViewById(R.id.etNewItem);
         String itemText = etNewItem.getText().toString();
         itemsAdapter.add(itemText);
-        //after we got the string we want to make the textfield empty again
         etNewItem.setText("");
         writeItems();
-        //a toast: signal that we are done
         Toast.makeText(getApplicationContext(), "Item added to list", Toast.LENGTH_SHORT).show();
     }
 
-    //method that will allow for removal
-    //why is it private because we are calling it directly and not getting the framework to do so
     private void setupListViewListener(){
         Log.i("MainActivity", "Setting up listener on list view");
         lvItems.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener(){
             @Override
             public boolean onItemLongClick(AdapterView<?> adapterView, View view, int i, long l) {
                 Log.i("MainActivity", "Item removed from list" + l);
-                //removal logic
+
                 items.remove(i);
                 itemsAdapter.notifyDataSetChanged();
                 writeItems();
-                //whether the method we are providing consumes the long click
+
                 return true;
             }
         });
+
+        lvItems.setOnItemClickListener(new AdapterView.OnItemClickListener(){
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                //create the new activity
+                Intent intent = new Intent(MainActivity.this, EditItemActivity.class);
+                //pass the data being edited
+                intent.putExtra(ITEM_TEXT, items.get(i));
+                intent.putExtra(ITEM_POSITION, i);
+                //display the activity
+                startActivityForResult(intent, EDIT_REQUEST_CODE);
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_OK && requestCode == EDIT_REQUEST_CODE){
+            String updatedItem = data.getExtras().getString(ITEM_TEXT);
+            int position = data.getExtras().getInt(ITEM_POSITION);
+            items.set(position, updatedItem);
+            itemsAdapter.notifyDataSetChanged();
+            writeItems();
+            Toast.makeText(this, "Item updated successfully", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private File getDataFile(){
@@ -72,9 +100,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void readItems(){
-        //file utils comes from commons io
-        //why do we need the try catch file: possibly throw us an exception: e.g.
-        //file doesn't exist or there is a problem reading the file
         try {
             items = new ArrayList<>(FileUtils.readLines(getDataFile(), Charset.defaultCharset()));
         } catch (IOException e) {
